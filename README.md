@@ -6,6 +6,7 @@ A golang client for [OKR for Jira](https://digitaltoucan.com/products/okr-for-ji
 This client implements the API described in
 * [OKR API documentation](https://intercom.help/okr-for-jira/en/articles/6178256-okr-api-documentation)
 * [API query methods](https://intercom.help/okr-for-jira/en/articles/6178378-api-query-methods)
+* [API update methods](https://intercom.help/okr-for-jira/en/articles/6252250-api-update-methods)
 
 Digital Toucan is a company that continuously improves *OKR for Jira*.
 Although good care has been provided to this package, it is possible that at some point the API evolves and this package becomes outdated.

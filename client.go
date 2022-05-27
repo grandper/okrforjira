@@ -2,6 +2,7 @@ package okrforjira
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -183,12 +184,64 @@ func (c *Client) KeyResultsByIDs(ctx context.Context, keyResultIDs, expand []str
 	return response, nil
 }
 
+type objectiveUpdateRequest struct {
+	ObjectiveID string `json:"objectiveId"`
+	Status      string `json:"status"`
+	Description string `json:"description"`
+}
+
+// UpdateObjective update the provided objective.
+func (c *Client) UpdateObjective(ctx context.Context, objectiveID, status, description string) (Update, error) {
+	request := objectiveUpdateRequest{
+		ObjectiveID: objectiveID,
+		Status:      status,
+		Description: description,
+	}
+	data, err := json.Marshal(request)
+	if err != nil {
+		return Update{}, fmt.Errorf("failed to update the objective: %w", err)
+	}
+	var response Update
+	if err := c.executePostQuery(objectiveUpdateURL, string(data), &response); err != nil {
+		return Update{}, fmt.Errorf("failed to update the objective: %w", err)
+	}
+	return response, nil
+}
+
+type keyResultUpdateRequest struct {
+	KeyResultID string  `json:"keyResultId"`
+	Status      string  `json:"status"`
+	NewValue    float64 `json:"newValue"`
+	Description string  `json:"description"`
+}
+
+// UpdateKeyResult update the provided key result.
+func (c *Client) UpdateKeyResult(ctx context.Context, keyResultID, status string, newValue float64, description string) (Update, error) {
+	request := keyResultUpdateRequest{
+		KeyResultID: keyResultID,
+		Status:      status,
+		NewValue:    newValue,
+		Description: description,
+	}
+	data, err := json.Marshal(request)
+	if err != nil {
+		return Update{}, fmt.Errorf("failed to update the key result: %w", err)
+	}
+	var response Update
+	if err := c.executePostQuery(keyResultUpdateURL, string(data), &response); err != nil {
+		return Update{}, fmt.Errorf("failed to update the key result: %w", err)
+	}
+	return response, nil
+}
+
 const (
 	host                = "https://okr-for-jira-prod.herokuapp.com"
 	objectivesByDateURL = host + "/api/v2/api-export/objectives/byDate?startDateEpochMilli=%d&deadlineEpochMilli=%d&expand=%s"
 	objectivesByIDsURL  = host + "/api/v2/api-export/objectives/byIds?objectiveIds=%s&expand=%s"
 	keyResultsByDateURL = host + "/api/v2/api-export/keyResults/byDate?startDateEpochMilli=%d&deadlineEpochMilli=%d&expand=%s"
 	keyREsultsByIDsURL  = host + "/api/v2/api-export/keyResults/byIds?keyResultIds=%s&expand=%s"
+	objectiveUpdateURL  = host + "/api/v2/api-update/objectives"
+	keyResultUpdateURL  = host + "/api/v2/api-update/keyResults"
 	dateFormat          = "2006-01-02T15:04:05-0700"
 )
 
@@ -223,6 +276,36 @@ func (c Client) executeGetQuery(url string) (Response, error) {
 		return Response{}, err
 	}
 	return response, nil
+}
+
+func (c Client) executePostQuery(url string, body string, response interface{}) error {
+	req, err := http.NewRequest("POST", url, strings.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("API-Token", c.token)
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Accept", "application/json")
+	r, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+
+	if r.StatusCode != 200 && r.StatusCode != 201 {
+		content, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("error status %d: %s", r.StatusCode, string(content))
+	}
+
+	json := jsontime.ConfigWithCustomTimeFormat
+	jsontime.AddTimeFormatAlias("okr4j_format", dateFormat)
+	if err := json.NewDecoder(r.Body).Decode(response); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *Client) checkObject(expand []string) error {

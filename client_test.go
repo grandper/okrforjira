@@ -14,7 +14,9 @@ import (
 )
 
 // The tests are based on the examples provided by Digital Toucan
-// on the page https://intercom.help/okr-for-jira/en/articles/6178378-api-query-methods .
+// on the following pages:
+// - https://intercom.help/okr-for-jira/en/articles/6178378-api-query-methods .
+// - https://intercom.help/okr-for-jira/en/articles/6252250-api-update-methods .
 
 func TestNewClient(t *testing.T) {
 	t.Run("Create a simple client", func(t *testing.T) {
@@ -1854,6 +1856,93 @@ func TestClient_KeyResultsByIDs(t *testing.T) {
 			},
 		},
 		Labels: []okrforjira.Label{},
+	}
+	if !cmp.Equal(got, want) {
+		t.Errorf("unexpected result:\n%s", cmp.Diff(got, want))
+	}
+}
+
+func TestClient_UpdateObjective(t *testing.T) {
+	client := NewTestClient(func(req *http.Request) *http.Response {
+		// Test request parameters
+		assert.Equal(t, req.URL.String(), "https://okr-for-jira-prod.herokuapp.com/api/v2/api-update/objectives")
+		assert.Equal(t, req.Header.Get("API-Token"), token)
+		return &http.Response{
+			StatusCode: 200,
+			// Send response to be tested
+			Body: ioutil.NopCloser(bytes.NewBufferString(`{
+	"entityId": "62334eac00ee2b102e34fdb7",
+	"status": "ON TRACK",
+	"created": "2022-05-20T09:58:09+0000",
+	"value": null,
+	"description": "Spaceship assembly docks are delivering on time"
+}`)),
+			// Must be set to non-nil value or it panics
+			Header: make(http.Header),
+		}
+	})
+
+	ctx := context.Background()
+
+	const (
+		objectiveID = "62334eac00ee2b102e34fdb7"
+		status      = "ON TRACK"
+		description = "Spaceship assembly docks are delivering on time"
+	)
+	c := okrforjira.NewClient(client, token)
+	got, err := c.UpdateObjective(ctx, objectiveID, status, description)
+	assert.NoError(t, err)
+
+	want := okrforjira.Update{
+		EntityID:    objectiveID,
+		Status:      status,
+		Created:     time.Date(2022, time.May, 20, 9, 58, 9, 0, time.UTC),
+		Value:       0.0,
+		Description: description,
+	}
+	if !cmp.Equal(got, want) {
+		t.Errorf("unexpected result:\n%s", cmp.Diff(got, want))
+	}
+}
+
+func TestClient_UpdateKeyResult(t *testing.T) {
+	client := NewTestClient(func(req *http.Request) *http.Response {
+		// Test request parameters
+		assert.Equal(t, req.URL.String(), "https://okr-for-jira-prod.herokuapp.com/api/v2/api-update/keyResults")
+		assert.Equal(t, req.Header.Get("API-Token"), token)
+		return &http.Response{
+			StatusCode: 200,
+			// Send response to be tested
+			Body: ioutil.NopCloser(bytes.NewBufferString(`{
+	"entityId": "62384a6942adda046598b3bd",
+	"status": "AT RISK",
+	"created": "2022-05-20T13:01:35+0000",
+	"value": 13500.5,
+	"description": "Reduction in ship hull output is caused by Unobtainium supply disruptions."
+}`)),
+			// Must be set to non-nil value or it panics
+			Header: make(http.Header),
+		}
+	})
+
+	ctx := context.Background()
+
+	const (
+		keyResultID = "62384a6942adda046598b3bd"
+		status      = "AT RISK"
+		value       = 13500.5
+		description = "Reduction in ship hull output is caused by Unobtainium supply disruptions."
+	)
+	c := okrforjira.NewClient(client, token)
+	got, err := c.UpdateKeyResult(ctx, keyResultID, status, value, description)
+	assert.NoError(t, err)
+
+	want := okrforjira.Update{
+		EntityID:    keyResultID,
+		Status:      status,
+		Created:     time.Date(2022, time.May, 20, 13, 1, 35, 0, time.UTC),
+		Value:       value,
+		Description: description,
 	}
 	if !cmp.Equal(got, want) {
 		t.Errorf("unexpected result:\n%s", cmp.Diff(got, want))
